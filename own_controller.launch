@@ -1,0 +1,7 @@
+1. Creating the package
+    $ cd ~/catkin_ws/src
+    $ catkin_create_pkg my_controller roscpp pluginlib controller_interface hardware_interface
+2. Creating the source code of the controller
+    my_controller.cpp
+
+      
