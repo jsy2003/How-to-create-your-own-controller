@@ -114,5 +114,17 @@
             </launch>
     
 
+9. test
+	$ roslaunch my_robot_control my_robot_control.launch
+
+	$ rostopic list
+	$ rostopic pub  -1 robot/joint1_position_controller/command  std_msgs/Float64 “data=0.1” 
+	$ rostopic pub  -1 robot/joint2_position_controller/command  std_msgs/Float64 “data=0.1” 
+
+	$ rosrun rqt_gui rqt_gui  => How To Interact with robot joints graphically
+   		=> menu : plugin/ topic/ message
+   		=> topic : robot/joint1_position_controller/command   ⇒ (+) click 
+
+
 
 
