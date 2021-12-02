@@ -2,6 +2,117 @@
     $ cd ~/catkin_ws/src
     $ catkin_create_pkg my_controller roscpp pluginlib controller_interface hardware_interface
 2. Creating the source code of the controller
-    my_controller.cpp
+    $ mkdir my_controller/src/my_controller.cpp
+            #include <controller_interface/controller.h>
+            #include <hardware_interface/joint_command_interface.h>
+            #include <pluginlib/class_list_macros.h>
+            #include <std_msgs/Float64.h>
+
+            namespace my_controller_ns{
+                class myPositionController : public controller_interface::Controller<hardware_interface::EffortJointInterface>
+                {
+	                bool init(hardware_interface::EffortJointInterface *hw, ros::NodeHandle &n)
+                    {
+                        std::string my_joint;
+                        if(!n.getParam(“joint”, my_joint)) {
+                            ROS_ERROR(“could not find joint name”);
+                            return false;
+                        }
+                        joint_= hw->getHandle(my_joint);
+                        command_ = joint_.getPosition();
+
+                        if(!n.getParam(“gain”, gain)) {
+                            ROS_ERROR(“could not find the gain param”);
+                            return false;
+                        }	
+
+                        sub_command = n.subscribe<std_msgs::Float64>(“command”, 1, &myPositionColtroller::setCommandCB, this);
+                        return true; 
+                    }
+                
+                    void update(const ros::Time &time, const ros::Duration &period)
+                    {
+		                double error = command_ - joint_.getPosition();
+		                double commanded_effort = error*gain_;
+		                joint_.setCommand(commanded_effort);
+                    }
+
+                    void setCommandCB(const std_msgs::Float64ConstPtr &msg)
+                    {
+		                command_ = msg->data;
+                    }
+
+                    void starting(const ros::time &time) { }
+                    void stopping(const ros::Time &time) { }
+                private:
+	                hardware_interface::JointHandle joint_;
+	                double gain_;
+	                double command_;
+	                ros::Sunscriber sub_command_;
+
+                };
+
+            PLUGINLIB_EXPORT_CLASS(my_controller_ns::myPositionController,  controller_interface::ControllerBase);	
+        }
 
       
+3. Creating pluginlib description file ( my_controller_plugins.xml)
+    <library path=”lib/libmy_controller_lib”>
+	    <class name=”my_controller/myPositionController”
+		    type=”my_controller_ns::myPositionController”
+		    base_class_type=”controller_interface::ControllerBase” />
+    </library>
+
+4. Updating the package.xml file ( inside <export> tag ) 
+    <controller_interface plugin =”${prefix}/my_controller_plugins.xml”/>
+                
+5. Updating the CmakeList.txt file
+    add_library<my_controller_lib src/my_controller.cpp)
+    target_link_libraries(my_controller_lib &(catkin_LIBRARYES})
+                                  
+6. Build the controller
+    $ catkin_make
+
+    // check
+    $rospack plugins -- attrib=plugin controller_interface | grep my_controller  
+       => my_controller /home/user/catkin_ws/src/my_controller/controller_plugins.xml
+
+    $rospack profile
+
+7. Write the configuration file(.yaml)  -> new create head_pan_joint_position_controller
+    $mkdir config/my_controller.yaml
+           head_pan_joint_position_controller:
+                type: my_controller/myPositionController
+                joint: head_pan_joint
+                gain: 0.1
+                
+8. Write the launch file
+     $mkdir launch/my_controller.launch
+            <launch>
+                <param name=”robot_description” command= “cat &(find my_robot_pkg)/urdf/robot.urdf”/>
+ 
+                <rosparam file=”$(find my_robot_control)/config/my_robot_conrol.yaml” command=”load”/>
+    
+                <node name=”controller_spawner” pkg=”controller_manager” type=”spawner” respawn=”false”
+	                        output=”screen” ns=”/rrbot” 
+                            args=”joint1_position_controller joint2_position_controller joint_state_controller head_pan_joint_position_controller”/>
+    
+                <!- convert joint states to TP transforms for rviz,etc…-->
+                <node name=”robot_state_publisher” pkg=”robot_state_publisher” type=”robot_state_publisher”
+                          respawn=”false” output=”screen” >
+                        <remap from=”/joint_states” to=”/rrbot/joint_states” />
+                </node>
+
+                <!-- Move the joint(manually)
+                <node name=”joint_state_publisher” pkg=”robot_state_publisher” type=”robot_state_publisher”>
+                    <param name=”use_gui” value=”TRUE”/>
+                </node>
+                    
+                <!-- Show inRviz →
+                <node name=”rviz” pkg=”rviz” type= “rviz” args=”$(find my_robot_pkg)/launch/my_robot.rviz”/>
+ 	
+            </launch>
+    
+
+
+
